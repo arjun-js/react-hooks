@@ -1,16 +1,43 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useReducer } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
 import Search from './Search';
 import ErrorModal from '../UI/ErrorModal';
 
+const ingredientsReducer = (currentIngredients, action)=>{
+  switch(action.type){
+    case 'SET':
+      return action.ingredients;
+      case 'ADD':
+        return [...currentIngredients, action.ingredient];
+        case 'DELETE':
+          return currentIngredients.filter(ing=>ing.id !== action.id);
+          default:
+            throw new Error('should not come here')
+  }
+}
+
+const httpReducer = (httpState, action)=>{
+  switch(action.type){
+    case 'SEND':
+      return { loading : true, error: null}
+      case 'SUCCESS':
+        return {loading: false, error : null}
+        case 'ERROR':
+          return {loading: false, error: action.errorMessage}
+          default: 
+            throw new Error('Should not come here dude');
+  }
+}
+
 function Ingredients() {
-  const [ingredientList, setIngredientList] = useState([]);
-  const [isLoading, setLoader] = useState(false);
-  const [error, setError] = useState();
+  const [ingredientsList, dispatch] = useReducer(ingredientsReducer,[]);
+  const [httpState, httpStateDispatch] = useReducer(httpReducer, {
+    loading : false, error: null
+  });
   const addIngredientHandler = (ingredient) => {
-    setLoader(true);
+    httpStateDispatch({type: 'SEND'});
     fetch(
       'https://practicing-react-a7ede-default-rtdb.firebaseio.com/ingredients.json',
       {
@@ -22,51 +49,47 @@ function Ingredients() {
       }
     )
       .then((response) => {
-        setLoader(false);
+        httpStateDispatch({type: 'SUCCESS'});
         return response.json();
       })
       .then((responseData) => {
-        setIngredientList((prevState) => [
-          ...ingredientList,
-          { id: responseData.name, ...ingredient },
-        ]);
+        dispatch({type: 'ADD', ingredient: { id: responseData.name, ...ingredient }})
       });
   };
 
   const onFilterChangeHandler = useCallback((filteredList=>{
-    setIngredientList(filteredList);
-  }), [setIngredientList]);
+    dispatch({type: 'SET', ingredients : filteredList})
+  }), []);
 
   const onRemoveHandler = (id)=>{
-    setLoader(true);
+    httpStateDispatch({type: 'SEND'});
     fetch(
       `https://practicing-react-a7ede-default-rtdb.firebaseio.com/ingredients/${id}.json`,
       {
         method: 'DELETE',
       }
     ).then(response=>{
-      setLoader(false);
-      setIngredientList(prevList=>prevList.filter(ing=>ing.id!==id))
+      httpStateDispatch({type: 'SUCCESS'});
+      dispatch({type: 'DELETE', id: id});
     }).catch(error=>{
-      setError(error.message);
+      httpStateDispatch({type: 'ERROR', error: error.message});
     })
   }
 
   const onModalClose= ()=>{
-    setError();
-    setLoader(false);
+    httpStateDispatch({type: 'SUCCESS'});
   }
 
   return (
     <div className="App">
-      <IngredientForm onAddIngredient={addIngredientHandler} loading={isLoading} />
+      <IngredientForm onAddIngredient={addIngredientHandler} loading={httpState.loading} />
 
       <section>
         <Search onFilterChangeHandler={onFilterChangeHandler} />
         {/* Need to add list here! */}
       </section>
-      <IngredientList ingredients={ingredientList} onRemoveItem={onRemoveHandler} />
-      {error && <ErrorModal onClose={onModalClose}>{error}</ErrorModal>}
+      <IngredientList ingredients={ingredientsList} onRemoveItem={onRemoveHandler} />
+      {httpState.error && <ErrorModal onClose={onModalClose}>{httpState.error}</ErrorModal>}
     </div>
   );
 }
