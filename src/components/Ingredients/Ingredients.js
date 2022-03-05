@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useReducer } from 'react';
+import React, { useState, useCallback, useReducer, useMemo } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
@@ -61,7 +61,7 @@ function Ingredients() {
     dispatch({type: 'SET', ingredients : filteredList})
   }), []);
 
-  const onRemoveHandler = (id)=>{
+  const onRemoveHandler = useCallback((id)=>{
     httpStateDispatch({type: 'SEND'});
     fetch(
       `https://practicing-react-a7ede-default-rtdb.firebaseio.com/ingredients/${id}.json`,
@@ -74,11 +74,15 @@ function Ingredients() {
     }).catch(error=>{
       httpStateDispatch({type: 'ERROR', error: error.message});
     })
-  }
+  }, [])
 
   const onModalClose= ()=>{
     httpStateDispatch({type: 'SUCCESS'});
   }
+
+  const ingredientListComponent = useMemo(()=>{
+    return (<IngredientList ingredients={ingredientsList} onRemoveItem={onRemoveHandler} />)
+  }, [ingredientsList,onRemoveHandler])
 
   return (
     <div className="App">
@@ -88,7 +92,7 @@ function Ingredients() {
         <Search onFilterChangeHandler={onFilterChangeHandler} />
         {/* Need to add list here! */}
       </section>
-      <IngredientList ingredients={ingredientsList} onRemoveItem={onRemoveHandler} />
+      {ingredientListComponent}
       {httpState.error && <ErrorModal onClose={onModalClose}>{httpState.error}</ErrorModal>}
     </div>
   );
